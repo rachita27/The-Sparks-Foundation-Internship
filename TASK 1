@@ -1,0 +1,74 @@
+library(readxl)
+data = read_xlsx("first.xlsx")
+head(data,6)
+str(data)
+summary(data)
+cor.test(data$Hours, data$Scores) ##showing p-value too small so reject null, 
+#implies alternate hypothesis is true, that is correlation exists, that to positive linear relation
+# that is, both the variables moves in same direction 
+library(Amelia)
+missmap(data, col = c("black","yellow")) ## no missing value
+
+##EXPLORATORY DATA ANALYSIS
+library(ggplot2)
+library(plotly)
+library(MASS)
+df = ggplot(data, aes(x= Hours))+geom_histogram(fill = "red",alpha = 0.5,col = "black",bins = 30)+scale_x_continuous(breaks = seq(0,11,1))+theme_bw()
+df
+ggplot(data, aes(x= Hours))+geom_line(size = 1.5, color="red", group = 1)+theme_bw()
+##showing it has bi-modal distribution as it has two peaks.
+dd = ggplot(data, aes(x= Scores))+geom_histogram(fill = "red",alpha = 0.5,col = "black",bins = 30)+theme_bw()
+ggplotly(dd)
+##right skewed distribution
+
+ggplot(data , aes(x= Hours, y = Scores))+geom_line(col = "green")+theme_bw()
+ggplot(data , aes(x= Hours, y = Scores))+geom_point()+geom_smooth(method = 'lm', se = FALSE, col = "red")+theme_bw()+ggtitle("Scores v/s Hours")
+## POSITIVE RELATION BETWEEN HOURS & SCORE THAT IS AS HOURS OS STUDY INCREASE SCORE INCREASE (AS PLOTTED lm)
+
+###MODELLING
+model = lm(formula = Scores ~ . , data = data)
+summary(model)
+## slope is positive & significant as p-value is statistically significant, 
+##implies rejecting NULL, implies Hours SIGNIFICANT in explaining in Scores.
+## Multiple R-squared:  0.9529, implies 95% explained variation of Scores is explained by Hours
+Prediction_error_rate = sigma(model)/mean(data$Scores) #0.1088395
+MSE = mean(data)
+
+##80:20 split
+library(caTools)
+library(dplyr)
+set.seed(100)
+samp = sample.split(data$Scores, SplitRatio = 0.8)
+data_train = subset(data, samp ==TRUE)
+data_test = subset(data, samp ==FALSE)
+mod = lm(data = data_train,formula = Scores ~ .)
+summary(mod)
+predicted = predict(mod,data_test)
+data_fr = cbind.data.frame("predict"= predicted, "actual" = data_test$Scores)
+MSE = mean((data_fr$predict - data_fr$actual)^2)
+##
+corr = cor(data_fr$predict,data_fr$actual) ##0.955 implying actual & predicted are quite close to each other, implies model is performing well
+MMA = mean(apply(data_fr,1,min)/apply(data_fr,1,max)) #0.888 MIN-MAX ACCURACY
+MAPE = mean(abs(data_fr$actual - data_fr$predict)/data_fr$actual) #0.1185807 min absolute percentage error
+
+##5 fOLD CROSS VALIDATION
+predicted_frame = as.list(NA)
+actual_frame = as.list(NA)
+for(i in 1:5) {
+  sampl = sample.split(data$Scores, SplitRatio = 0.8)
+  data_train1 = subset(data, sampl ==TRUE)
+  data_test1 = subset(data, sampl ==FALSE)
+  mod1 = lm(data = data_train1,formula = Scores ~ .)
+  pred1 = predict(mod1, data_test1)
+  predicted_frame[i] = as.data.frame(pred1)
+  actual_frame[i] = as.data.frame(data_test1$Scores)
+}
+pred = as.data.frame(predicted_frame)
+colnames(pred)= c("pred1","pred2","pred3","pred4","pred5")
+pred$ mean = apply(pred,1,mean)
+
+act = as.data.frame(actual_frame)
+colnames(act)= c("act1","act2","act3","act4","act5")
+act$avg_act = apply(act,1,mean)
+cor(act$avg_act, pred$mean) # 0.882357
+MSE1 = mean((act$avg_act - pred$mean)^2)
