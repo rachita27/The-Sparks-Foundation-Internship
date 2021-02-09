@@ -1,0 +1,71 @@
+data = read.csv("Iris.csv")
+head(data)
+str(data)
+data$Species = factor(data$Species)
+
+minimum = apply(data[,-c(1,6)],2,min)
+maximum = apply(data[,-c(1,6)],2,max)
+scaled = scale(data[,-c(1,6)], center = minimum , scale = maximum - minimum )
+scaled1 = as.data.frame(scaled)
+scaled1 = cbind(data[1], scaled1,  data[6])
+
+library(Amelia)
+missmap(data, col = c("black","yellow")) ## no missing value
+
+##CLUSTERING
+mod = kmeans(scaled1[,-c(1,6)], centers = 3, nstart =  1)
+library(cluster)
+clusplot(scaled1[,-c(1,6)], mod$cluster, color=TRUE, shade=TRUE, lines=0, main = "Clusplot")
+title()
+library(factoextra)
+fviz_cluster(mod, data = scaled1[,-c(6)], palette = c("#FFC300", "#FF0F00", "#B100FF"), 
+             geom = "point",
+             ellipse.type = "convex", legend = "right",
+             ggtheme = theme_bw() )
+
+##CHOOSING NUMBER OF CLUSTERS USING ELBOW METHOD
+tot_withiness = NA
+for(i in 1:100){
+  model = kmeans(scaled1[,-c(1,6)], centers = i, nstart =  1)
+  tot_withiness[i] = model$tot.withinss
+}
+ 
+k = 1:100
+eb = cbind.data.frame(tot_withiness, k)
+ff = ggplot(eb, aes(x = k , y = tot_withiness)) + geom_point()+ scale_x_continuous(breaks = seq(0,101,10))+geom_line()+theme_bw()
+library(plotly)
+ggplotly(ff) ## beyond k=4 no significant fall in total withiness
+
+mod_new = kmeans(scaled1[,-c(1,6)], centers = 4, nstart =  1)
+clusplot(scaled1[,-c(1,6)], mod_new$cluster, color=TRUE, shade=TRUE, lines=0, main = "Clusplot")
+
+fviz_cluster(mod_new, data = scaled1[,-c(6)], palette = c("#FFC300", "#FF0F00", "#00FF3E", "#0020FF"), 
+             geom = "point",
+             ellipse.type = "convex", legend = "right",
+             ggtheme = theme_bw() )
+
+mod_new = kmeans(scaled1[,-c(1,6)], centers = 4, nstart =  1)
+clusplot(scaled1[,-c(1,6)], mod_new$cluster, color=TRUE, shade=TRUE, lines=0, main = "Clusplot")
+mod_new2 = kmeans(scaled1[,-c(1,6)], centers = 5, nstart =  1)
+fviz_cluster(mod_new2, data = scaled1[,-c(6)], palette = c("#FFC300", "#FF0F00", "#00FF3E", "#0020FF", "grey"), 
+             geom = "point",
+             ellipse.type = "convex", legend = "right",
+             ggtheme = theme_bw() )
+##ELBOW METHOD OPTION
+rng<-2:50 
+tries <-100 
+avg.totw.ss <-NA 
+
+for(v in rng){ 
+  v.totw.ss <- NA 
+  for(i in 1:tries){
+    k.temp <-kmeans(scaled1[,-c(1,6)],centers=v) 
+    v.totw.ss[i] <-k.temp$tot.withinss
+  }
+  avg.totw.ss[v-1] <- mean(v.totw.ss) 
+}
+
+dat_fr_u = cbind.data.frame(avg.totw.ss, rng)
+
+ggplot(dat_fr_u, aes( x= rng, y= avg.totw.ss))+geom_point()+geom_line()+xlab("K-VALUES")+theme_classic()
+##BEYOND 4 NO FURTHER FALL IN AVERAGE TOTAL WITHINESS
